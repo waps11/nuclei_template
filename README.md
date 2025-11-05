@@ -1,7 +1,7 @@
-# Nuclei Template - Post-Quantum Cryptographic Cipher Suites Detection
+# Nuclei Template - Post-Quantum Cryptographic Algorithm Detection
 
 ## Description
-This Nuclei template detects and extracts post-quantum cryptographic (PQC) cipher suites supported by TLS/SSL servers.
+This Nuclei template detects and extracts post-quantum cryptographic (PQC) algorithms supported by **TLS 1.3** servers.
 
 ## Detected Algorithms
 
@@ -33,32 +33,32 @@ go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest
 
 ### Scan a single server
 ```bash
-nuclei -t pqc-cipher-suites.yaml -u https://example.com
+nuclei -t pqc-detector.yaml -u https://example.com
 ```
 
 ### Scan a list of servers
 ```bash
-nuclei -t pqc-cipher-suites.yaml -l servers.txt
+nuclei -t pqc-detector.yaml -l servers.txt
 ```
 
 ### Scan with a custom port
 ```bash
-nuclei -t pqc-cipher-suites.yaml -u https://example.com:8443 -var Port=8443
+nuclei -t pqc-detector.yaml -u https://example.com:8443
 ```
 
 ### Scan with verbosity
 ```bash
-nuclei -t pqc-cipher-suites.yaml -l servers.txt -v
+nuclei -t pqc-detector.yaml -l servers.txt -v
 ```
 
 ### Export results to JSON
 ```bash
-nuclei -t pqc-cipher-suites.yaml -l servers.txt -json -o results.json
+nuclei -t pqc-detector.yaml -l servers.txt -json -o results.json
 ```
 
 ### Export results to Markdown
 ```bash
-nuclei -t pqc-cipher-suites.yaml -l servers.txt -markdown-export results.md
+nuclei -t pqc-detector.yaml -l servers.txt -markdown-export results.md
 ```
 
 ## Server List File Format
@@ -73,26 +73,26 @@ https://server3.example.com:443
 ## Example Output
 
 ```
-[pqc-cipher-suites-detection] [ssl] [info] https://example.com:443
-  [pqc_ciphers] TLS_AES_256_GCM_SHA384_KYBER768
-  [pqc_ciphers] X25519_KYBER768
+[pqc-detector] [ssl] [info] https://example.com:443
+  [pqc_algorithms] X25519Kyber768
   [tls_version] TLSv1.3
 ```
 
 ## Results Interpretation
 
-- **INFO**: The server supports post-quantum cryptographic cipher suites
+- **INFO**: The server supports post-quantum cryptographic algorithms
 - Extractors display:
-  - `pqc_ciphers`: Detected PQC cipher suites
+  - `pqc_algorithms`: Detected PQC algorithms
   - `tls_version`: TLS protocol version
-  - `all_cipher_info`: Complete cipher information
+  - Complete cipher information with algorithm details
 
 ## Important Notes
 
-1. **Limited current support**: Most production servers do not yet support PQC
-2. **Experimental implementations**: Some servers may have test implementations
-3. **Evolving standards**: Cipher suite names may vary by implementation
-4. **Performance**: PQC algorithms may be slower than classical algorithms
+1. **TLS 1.3 Only**: This template only scans TLS 1.3 connections
+2. **Limited current support**: Most production servers do not yet support PQC
+3. **Experimental implementations**: Some servers may have test implementations
+4. **Evolving standards**: Algorithm names may vary by implementation (legacy names like "Kyber" vs standardized "ML-KEM")
+5. **Performance**: PQC algorithms may be slower than classical algorithms
 
 ## References
 

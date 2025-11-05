@@ -1,0 +1,88 @@
+id: pqc-detector
+
+info:
+  name: Post-Quantum Cryptography Detection
+  author: Patrick Roy (https://github.com/waps11)
+  severity: info
+  description: |
+    Detects post-quantum cryptographic algorithms in TLS 1.3 connections.
+    Post-quantum algorithms are designed to be resistant to attacks by quantum computers.
+    This template identifies quantum-resistant algorithms like ML-KEM (Kyber), ML-DSA (Dilithium),
+    and their hybrid combinations with classical algorithms in the TLS handshake.
+  reference:
+    - https://www.iana.org/assignments/tls-parameters/tls-parameters.xhtml
+    - https://datatracker.ietf.org/doc/draft-ietf-tls-hybrid-design/
+    - https://www.nist.gov/news-events/news/2022/07/nist-announces-first-four-quantum-resistant-cryptographic-algorithms
+    - https://csrc.nist.gov/projects/post-quantum-cryptography
+  classification:
+    cwe-id: CWE-326
+  metadata:
+    max-request: 1
+  tags: ssl,tls,pqc,post-quantum,cryptography,security
+
+ssl:
+  - address: "{{Host}}:{{Port}}"
+    min_version: tls13
+    max_version: tls13
+
+    extractors:
+      - type: dsl
+        dsl:
+          - "tls_version, cipher"
+
+    matchers:
+      - type: regex
+        name: pqc-algorithms
+        part: cipher
+        regex:
+          # ML-KEM (Kyber) - Key Encapsulation
+          - "(?i).*kyber.*"
+          - "(?i).*mlkem.*"
+          - "(?i).*ml[-_]kem.*"
+          # Hybrid key exchange
+          - "(?i).*x25519.*kyber.*"
+          - "(?i).*x25519.*mlkem.*"
+          - "(?i).*secp256r1.*kyber.*"
+          - "(?i).*secp384r1.*kyber.*"
+          - "(?i).*p[-_]?256.*kyber.*"
+          - "(?i).*p[-_]?384.*kyber.*"
+          # ML-DSA (Dilithium) - Signatures
+          - "(?i).*dilithium.*"
+          - "(?i).*mldsa.*"
+          - "(?i).*ml[-_]dsa.*"
+          # SLH-DSA (SPHINCS+)
+          - "(?i).*sphincs.*"
+          - "(?i).*slh[-_]dsa.*"
+          # Falcon
+          - "(?i).*falcon.*"
+          # NTRU
+          - "(?i).*ntru.*"
+          # Classic McEliece
+          - "(?i).*mceliece.*"
+          # Generic PQC indicators
+          - "(?i).*post[-_]?quantum.*"
+          - "(?i).*pqc.*"
+        condition: or
+
+# IANA Registry Reference for PQC:
+# 
+# TLS Supported Groups (Key Exchange):
+# - X25519Kyber768Draft00: 0xFE30 (experimental)
+# - SecP256r1Kyber768Draft00: 0xFE31 (experimental)
+# - X25519MLKEM768: TBD (standardization in progress)
+# - P-256MLKEM768: TBD (standardization in progress)
+# - P-384MLKEM1024: TBD (standardization in progress)
+#
+# Signature Algorithms (TLS 1.3):
+# - mldsa44: 0x0904
+# - mldsa65: 0x0905
+# - mldsa87: 0x0906
+#
+# Note: Post-quantum algorithms are negotiated via TLS extensions
+# (supported_groups, signature_algorithms) rather than traditional
+# cipher suites. This template searches for PQC algorithm names
+# that may appear in the negotiated cipher/group information.
+
+# Usage:
+# nuclei -t pqc-detector.yaml -u https://example.com
+# nuclei -t pqc-detector.yaml -l servers.txt
