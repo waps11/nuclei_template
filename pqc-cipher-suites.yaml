@@ -1,99 +1,165 @@
 id: pqc-cipher-suites-detection
 
 info:
-  name: Post-Quantum Cryptography Cipher Suites Detection
-  author: Patrick Roy (waps11@github)
+  name: Post-Quantum Cryptography Detection
+  author: Patrick Roy (https://github.com/waps11)
   severity: info
   description: |
-    Détecte et extrait les suites cryptographiques post-quantiques supportées par les serveurs TLS.
-    Ce template identifie les algorithmes résistants aux ordinateurs quantiques comme Kyber, Dilithium, etc.
+    Detects post-quantum cryptographic algorithms in TLS 1.3 connections by analyzing:
+    - Supported Groups extension (for hybrid key exchange like X25519Kyber768)
+    - SignatureAlgorithms extension (for ML-DSA/Dilithium signatures)
+    - Cipher suites (although PQC mainly uses supported_groups in TLS 1.3)
+    
+    This template identifies quantum-resistant algorithms like ML-KEM (Kyber), 
+    ML-DSA (Dilithium), and their hybrid combinations with classical algorithms.
+    
+    NOTE: This template specifically targets TLS 1.3.
   reference:
+    - https://www.iana.org/assignments/tls-parameters/tls-parameters.xhtml
+    - https://datatracker.ietf.org/doc/draft-ietf-tls-hybrid-design/
     - https://www.nist.gov/news-events/news/2022/07/nist-announces-first-four-quantum-resistant-cryptographic-algorithms
     - https://csrc.nist.gov/projects/post-quantum-cryptography
-  tags: tls,ssl,pqc,post-quantum,cryptography,security
+  classification:
+    cwe-id: CWE-326
+  tags: tls,ssl,pqc,post-quantum,cryptography,security,ml-kem,ml-dsa,kyber,dilithium
 
 ssl:
   - address: "{{Host}}:{{Port}}"
+    min_version: tls13
+    max_version: tls13
     
     matchers-condition: or
     matchers:
-      - type: word
-        part: cipher
-        words:
-          # Kyber - Key Encapsulation Mechanism
-          - "TLS_AES_128_GCM_SHA256_KYBER512"
-          - "TLS_AES_256_GCM_SHA384_KYBER768"
-          - "TLS_CHACHA20_POLY1305_SHA256_KYBER1024"
-          - "KYBER512"
-          - "KYBER768"
-          - "KYBER1024"
-          # NTRU - Alternative KEM
-          - "NTRU_HPS_2048_509"
-          - "NTRU_HPS_2048_677"
-          - "NTRU_HPS_4096_821"
-          - "NTRU_HRSS_701"
-          # Classic McEliece
-          - "CLASSIC_MCELIECE"
-          # SABER
-          - "SABER"
-          - "LIGHTSABER"
-          - "FIRESABER"
-          # Dilithium - Signatures
-          - "DILITHIUM2"
-          - "DILITHIUM3"
-          - "DILITHIUM5"
-          # Falcon - Signatures
-          - "FALCON512"
-          - "FALCON1024"
-          # SPHINCS+ - Signatures
-          - "SPHINCS_SHA256"
-          - "SPHINCS_SHAKE256"
-          # Hybrid schemes (PQC + Classical)
-          - "ECDHE_KYBER"
-          - "X25519_KYBER768"
-          - "P256_KYBER512"
-          - "P384_KYBER768"
+      # ML-KEM (formerly Kyber) - NIST standardized
+      - type: regex
+        part: response
+        name: ml-kem-detected
+        regex:
+          - "(?i)(ml[-_]?kem|kyber)[-_]?(512|768|1024)"
+          - "(?i)x25519[-_]?kyber768"
+          - "(?i)x25519[-_]?mlkem768"
+          - "(?i)p[-_]?256[-_]?kyber512"
+          - "(?i)p[-_]?256[-_]?mlkem768"
+          - "(?i)p[-_]?384[-_]?kyber768"
+          - "(?i)p[-_]?384[-_]?mlkem1024"
+          - "(?i)secp256r1[-_]?kyber768"
+          - "(?i)secp384r1[-_]?kyber1024"
         condition: or
 
+      # ML-DSA (formerly Dilithium) - Signature schemes
       - type: regex
-        part: cipher
+        part: response
+        name: ml-dsa-detected
         regex:
-          - "(?i)(kyber|ntru|dilithium|falcon|sphincs|saber|mceliece)[0-9]*"
-          - "(?i)pqc[_-]"
-          - "(?i)post[_-]?quantum"
+          - "(?i)(ml[-_]?dsa|dilithium)[-_]?(44|65|87)"
+          - "(?i)mldsa(44|65|87)"
+        condition: or
+
+      # SLH-DSA (formerly SPHINCS+)
+      - type: regex
+        part: response
+        name: slh-dsa-detected
+        regex:
+          - "(?i)(slh[-_]?dsa|sphincs)[-_]?(128|192|256)"
+          - "(?i)sphincs[-_]?(sha256|shake256)"
+        condition: or
+
+      # Falcon signatures
+      - type: regex
+        part: response
+        name: falcon-detected
+        regex:
+          - "(?i)falcon[-_]?(512|1024)"
+        condition: or
+
+      # NTRU (alternative KEM)
+      - type: regex
+        part: response
+        name: ntru-detected
+        regex:
+          - "(?i)ntru[-_]?(hps|hrss)"
+          - "(?i)ntru[-_]?\d+"
+        condition: or
+
+      # Classic McEliece
+      - type: regex
+        part: response
+        name: mceliece-detected
+        regex:
+          - "(?i)(classic[-_]?)?mceliece"
+        condition: or
+
+      # Generic PQC indicators
+      - type: regex
+        part: response
+        name: generic-pqc
+        regex:
+          - "(?i)(post[-_]?quantum|pqc)[-_]"
+          - "(?i)hybrid[-_]?(kem|pq)"
         condition: or
 
     extractors:
+      # Extract all PQC-related supported groups/KEMs
       - type: regex
-        part: cipher
-        name: pqc_ciphers
+        part: response
+        name: pqc_key_exchange
         group: 0
         regex:
-          - "TLS_[A-Z0-9_]+(?:KYBER|NTRU|DILITHIUM|FALCON|SPHINCS|SABER|MCELIECE)[0-9]*"
-          - "[A-Z0-9_]*(?:KYBER|NTRU|DILITHIUM|FALCON|SPHINCS|SABER)[0-9]*[A-Z0-9_]*"
+          - "(?i)([a-z0-9_-]*(?:kyber|mlkem|ml_kem)[a-z0-9_-]*)"
+          - "(?i)(x25519[_-]?(?:kyber|mlkem)768[a-z0-9_-]*)"
+          - "(?i)((?:secp|p)[_-]?(?:256|384)r?1?[_-]?(?:kyber|mlkem)[0-9]+)"
 
+      # Extract PQC signature algorithms
+      - type: regex
+        part: response
+        name: pqc_signatures
+        group: 0
+        regex:
+          - "(?i)((?:ml[-_]?dsa|dilithium|mldsa)[-_]?(?:44|65|87))"
+          - "(?i)((?:slh[-_]?dsa|sphincs)[-_]?[a-z0-9_-]+)"
+          - "(?i)(falcon[-_]?(?:512|1024))"
+
+      # Extract other PQC algorithms
+      - type: regex
+        part: response
+        name: pqc_other
+        group: 0
+        regex:
+          - "(?i)(ntru[a-z0-9_-]*)"
+          - "(?i)(mceliece[a-z0-9_-]*)"
+
+      # Extract full TLS details for context
       - type: json
         part: response
-        name: all_cipher_info
+        name: tls_connection_details
         json:
-          - '.cipher'
-          - '.cipher_suite'
           - '.tls_version'
+          - '.cipher'
+          - '.not_after'
+          - '.subject_cn'
 
-      - type: kval
-        part: response
-        name: tls_details
-        kval:
-          - tls_version
-          - cipher
-          - subject_cn
-          - issuer_cn
+# IANA Registry Reference - TLS Supported Groups for PQC:
+# Note: Many PQC algorithms use the supported_groups extension rather than cipher suites
+# 
+# Hybrid Key Exchange (draft values - not yet standardized):
+# - X25519Kyber768Draft00: 0xFE30 (experimental)
+# - SecP256r1Kyber768Draft00: 0xFE31 (experimental)  
+# - X25519MLKEM768: TBD (in standardization)
+# - P-256MLKEM768: TBD (in standardization)
+# - P-384MLKEM1024: TBD (in standardization)
+#
+# Signature Algorithms (TLS 1.3):
+# - mldsa44: 0x0904
+# - mldsa65: 0x0905  
+# - mldsa87: 0x0906
+#
+# Most PQC detection happens via TLS extensions (supported_groups, signature_algorithms)
+# rather than traditional cipher suite negotiation
 
-# Variables pour définir les ports communs à scanner
 variables:
   Port: "443"
 
-# Exemples d'utilisation:
+# Usage examples:
 # nuclei -t pqc-cipher-suites.yaml -u https://example.com
 # nuclei -t pqc-cipher-suites.yaml -l servers.txt
 # nuclei -t pqc-cipher-suites.yaml -u https://example.com:8443 -var Port=8443
